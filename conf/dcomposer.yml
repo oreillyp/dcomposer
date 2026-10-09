@@ -1,0 +1,287 @@
+################################################################################
+# Default D-Composer training
+################################################################################
+
+seed: 0
+amp: true
+save_path: runs/dcomposer
+resume: false
+tag: latest
+
+num_iters: 100000
+sample_freq: 5000
+val_freq: 2000
+batch_size: &batch_size 16
+val_batch_size: &val_batch_size 8
+num_workers: 8
+save_iters: [50000, 80000, 100000]
+sample_idx: [0, 1, 2, 3]
+
+compile_model: false
+compile_mode: default
+compile_backend: inductor
+compile_dynamic: false
+compile_fullgraph: false
+
+scheduler_name: exponential
+gamma: 0.999996
+warmup_steps: 0
+decay_steps: 100000
+min_scale: 0.0
+
+log_gpu_memory: true
+
+
+################################################################################
+# Sampling / TensorBoard reconstructions
+################################################################################
+
+top_p: 0.95
+top_k: null
+temp: 1.0
+argmax: false
+eos_threshold: null
+max_new_tokens: null
+render_max_duration: 10.0
+autoencoder_n_steps: 5
+autoencoder_cfg_weight: null
+
+################################################################################
+# Frozen codec
+################################################################################
+
+codec_run_dir: runs/doc
+codec_checkpoint: best
+codec_use_ema: true
+
+################################################################################
+# DComposer model
+################################################################################
+
+DComposer.n_vocab: 1652
+DComposer.n_latent_channels: 128
+DComposer.n_acoustic_tokens: 32
+DComposer.d_model: 512
+DComposer.n_heads: 8
+DComposer.n_layers_enc: 12
+DComposer.n_layers_dec: 12
+DComposer.mult: 4
+DComposer.p_dropout: 0.0
+DComposer.bias: true
+DComposer.max_len_encoder: 512
+DComposer.max_len_decoder: 2048
+DComposer.pos_enc: rope
+DComposer.qk_norm: true
+DComposer.use_sdpa: true
+DComposer.use_encoder: true
+
+AdamW.betas: [0.9, 0.95]
+AdamW.lr: 0.0001
+AdamW.weight_decay: 0.000001
+
+################################################################################
+# Data
+################################################################################
+
+sample_rate: &sample_rate 44100
+duration: &duration 3.0
+max_midi_duration: &max_midi_duration 4.0
+
+train/OneShotMidiDataset.midi_sources: [
+  "manifests/training/groove_train.csv",
+  "manifests/training/midi_train.csv",
+]
+train/OneShotMidiDataset.midi_source_weights: [0.05, 0.95]
+
+val/OneShotMidiDataset.midi_sources: [
+  "manifests/training/groove_val.csv",
+  "manifests/training/midi_val.csv",
+]
+val/OneShotMidiDataset.midi_source_weights: [0.05, 0.95]
+
+# Substitute a local sample collection for the unavailable training data.
+train/OneShotMidiDataset.oneshot_sources: ["manifests/training/oneshots_train.csv"]
+train/OneShotMidiDataset.oneshot_source_weights: [1.0]
+val/OneShotMidiDataset.oneshot_sources: ["manifests/training/oneshots_val.csv"]
+val/OneShotMidiDataset.oneshot_source_weights: [1.0]
+
+train/OneShotMidiDataset.n_examples: 100000000
+val/OneShotMidiDataset.n_examples: 2000
+
+OneShotMidiDataset.sample_rate: *sample_rate
+OneShotMidiDataset.duration: *duration
+OneShotMidiDataset.max_midi_events: 50
+OneShotMidiDataset.max_midi_duration: *max_midi_duration
+OneShotMidiDataset.num_channels: 2
+OneShotMidiDataset.n_variations: 4
+OneShotMidiDataset.hierarchy_level: coarse
+OneShotMidiDataset.midi_relative_path: .
+OneShotMidiDataset.oneshot_relative_path: .
+OneShotMidiDataset.oneshot_with_replacement: true
+OneShotMidiDataset.audio_backend: packed
+OneShotMidiDataset.shuffle_state: 0
+OneShotMidiDataset.p_same_kit: 0.4
+OneShotMidiDataset.same_kit_max_tries: 2
+OneShotMidiDataset.same_kit_min_coarse_classes: 3
+OneShotMidiDataset.from_start: true
+OneShotMidiDataset.midi_max_tries: 4
+
+################################################################################
+# Batch builder
+################################################################################
+
+train/build_builder_config.max_duration: *max_midi_duration
+train/build_builder_config.p_speed: 0.5
+train/build_builder_config.speed_ratio: ["uniform", 0.9, 1.1]
+train/build_builder_config.p_timing_jitter: 0.5
+train/build_builder_config.timing_jitter_std: ["uniform", 0.005, 0.03]
+train/build_builder_config.p_velocity_jitter: 0.5
+train/build_builder_config.velocity_jitter_std: ["uniform", 1.0, 5.0]
+train/build_builder_config.p_time_shift: 0.8
+train/build_builder_config.time_shift: ["uniform", 0.0, 1.0]
+train/build_builder_config.p_normalize_loudness: 0.8
+
+val/build_builder_config.max_duration: *max_midi_duration
+val/build_builder_config.p_speed: 0.5
+val/build_builder_config.speed_ratio: ["uniform", 0.9, 1.1]
+val/build_builder_config.p_timing_jitter: 0.0
+val/build_builder_config.timing_jitter_std: ["uniform", 0.005, 0.03]
+val/build_builder_config.p_velocity_jitter: 0.0
+val/build_builder_config.velocity_jitter_std: ["uniform", 1.0, 5.0]
+val/build_builder_config.p_time_shift: 0.25
+val/build_builder_config.time_shift: ["uniform", 0.0, 1.0]
+val/build_builder_config.p_normalize_loudness: 0.8
+
+################################################################################
+# Target formatting
+################################################################################
+
+train/build_target_config.tokenizer_batch_size: *batch_size
+train/build_target_config.scale: true
+
+val/build_target_config.tokenizer_batch_size: *batch_size
+val/build_target_config.scale: true
+
+################################################################################
+# Batch-building transforms
+################################################################################
+
+train_oneshot/build_transform.names: [
+  "Speed",
+  "WaveshaperDistortion",
+  "Delay",
+  "NoiseReverb",
+  "RoomImpulseResponse",
+  "HighPass",
+  "LowPass",
+  "ClippingDistortion",
+]
+train_oneshot/build_transform.prob: 1.0
+
+train_mix/build_transform.names: [
+  "FiNSReverb",
+  "ParametricEqualizer",
+  "Compressor",
+]
+train_mix/build_transform.prob: 1.0
+
+val_oneshot/build_transform.names: ["Identity"]
+val_oneshot/build_transform.prob: 1.0
+
+val_mix/build_transform.names: ["Identity"]
+val_mix/build_transform.prob: 1.0
+
+
+Speed.prob: 0.25
+Speed.ratio: ["uniform", 0.75, 1.25]
+Speed.force_fast: true
+Speed.match_energy: true
+Speed.ensure_max_of_audio: true
+
+ParametricEqualizer.prob: 0.25
+ParametricEqualizer.match_energy: true
+ParametricEqualizer.ensure_max_of_audio: true
+
+WaveshaperDistortion.prob: 0.1
+WaveshaperDistortion.drive: ["uniform", 1.0, 10.0]
+WaveshaperDistortion.mix: ["uniform", 0.5, 1.0]
+WaveshaperDistortion.normalize: false
+WaveshaperDistortion.match_energy: true
+WaveshaperDistortion.ensure_max_of_audio: true
+
+Delay.prob: 0.2
+Delay.delay_ms: ["uniform", 30.0, 200.0]
+Delay.feedback: ["uniform", 0.2, 0.7]
+Delay.n_taps: 16
+Delay.mix: ["uniform", 0.1, 0.4]
+Delay.low_cutoff: ["choice", [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000]]
+Delay.high_cutoff: ["choice", [2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000, 11000, 12000, 13000, 14000, 15000, 16000]]
+Delay.match_energy: true
+Delay.ensure_max_of_audio: true
+
+FiNSReverb.prob: 0.05
+FiNSReverb.mix: ["uniform", 0.05, 0.3]
+FiNSReverb.start_at_peak: false
+FiNSReverb.match_energy: true
+FiNSReverb.ensure_max_of_audio: true
+
+NoiseReverb.prob: 0.05
+NoiseReverb.mix: ["uniform", 0.1, 0.5]
+NoiseReverb.decay: ["uniform", 0.05, 0.6]
+NoiseReverb.ir_duration: ["uniform", 0.1, 1.0]
+NoiseReverb.attack: ["uniform", 0.0, 0.05]
+NoiseReverb.start_at_peak: false
+NoiseReverb.eq_amount: ["uniform", 0.0, 0.5]
+NoiseReverb.match_energy: true
+NoiseReverb.ensure_max_of_audio: true
+
+RoomImpulseResponse.prob: 0.1
+RoomImpulseResponse.resample_ir: false
+RoomImpulseResponse.eq_amount: ["uniform", 0.0, 0.5]
+RoomImpulseResponse.n_bands: 6
+RoomImpulseResponse.use_original_phase: false
+RoomImpulseResponse.start_at_peak: false
+RoomImpulseResponse.sources: [
+  "manifests/rir_synthetic/train.csv",
+  "manifests/rir_real/train.csv",
+  "manifests/mit_ir/train.csv",
+]
+RoomImpulseResponse.match_energy: true
+RoomImpulseResponse.ensure_max_of_audio: true
+
+HighPass.prob: 0.1
+HighPass.cutoff: ["choice", [50, 75, 100, 125, 150, 175, 200, 225, 250, 500, 1000]]
+HighPass.zeros: 51
+HighPass.quantize_hz: 1.0
+HighPass.match_energy: true
+HighPass.ensure_max_of_audio: true
+
+LowPass.prob: 0.1
+LowPass.cutoff: ["choice", [4000, 5000, 6000, 7000, 8000, 9000, 10000, 11000, 12000, 13000, 14000, 15000, 16000]]
+LowPass.zeros: 51
+LowPass.quantize_hz: 1.0
+LowPass.match_energy: true
+LowPass.ensure_max_of_audio: true
+
+Compressor.prob: 0.25
+Compressor.threshold_db: ["uniform", -35.0, -15.0]
+Compressor.ratio: ["uniform", 2.0, 30.0]
+Compressor.attack_ms: ["uniform", 1.0, 20.0]
+Compressor.release_ms: ["uniform", 20.0, 100.0]
+Compressor.knee_db: ["const", 0.0]
+Compressor.makeup_gain_db: ["const", 0.0]
+Compressor.lookahead_ms: ["const", 0.0]
+Compressor.sidechain: peak
+Compressor.match_energy: true
+Compressor.ensure_max_of_audio: true
+
+ClippingDistortion.prob: 0.025
+ClippingDistortion.perc: ["uniform", 0.0, 0.1]
+ClippingDistortion.mix: ["uniform", 0.5, 1.0]
+ClippingDistortion.match_energy: true
+ClippingDistortion.ensure_max_of_audio: true
+
+VolumeNorm.prob: 0.25
+VolumeNorm.db: ["uniform", -36.0, -8.0]
+VolumeNorm.match_energy: false
+VolumeNorm.ensure_max_of_audio: true

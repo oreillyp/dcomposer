@@ -1,0 +1,263 @@
+################################################################################
+# Training script
+################################################################################
+
+seed: 0
+amp: true
+save_path: runs/doc_stable_audio
+resume: false
+
+num_iters: 100000
+sample_freq: 4000
+val_freq: 2000
+batch_size: &batch_size 32
+val_batch_size: &val_batch_size 10
+num_workers: 8
+save_iters: [50000, 100000]
+sample_idx: [0, 1, 2, 3, 4, 5, 6, 7]
+
+sample_rate: &sample_rate 44100
+
+n_steps: 1
+solver: euler
+t_init: [0.0, 0.25, 0.50]
+t_schedule: linear
+t_schedule_scale: 1.0
+cfg_weight: null
+
+compile_model: false
+compile_mode: default
+compile_backend: inductor
+compile_dynamic: false
+compile_fullgraph: false
+
+scheduler_name: exponential
+gamma: 0.999996
+warmup_steps: 0
+decay_steps: 100000
+min_scale: 0.0
+
+log_gpu_memory: true
+
+audio_metric_freq: 5000
+audio_metric_num_batches: 10
+audio_metric_max_examples: 100
+
+use_ema: true
+ema_decay: 0.9999
+ema_device: "gpu"
+
+################################################################################
+# Model
+################################################################################
+
+build_loss_config.commitment_loss_weight: 0.25
+build_loss_config.codebook_loss_weight: 1.0
+
+LatentFlowAutoencoder.max_len: 64  # Measured for three seconds at 44.1 kHz.
+LatentFlowAutoencoder.n_channels_in: 64
+LatentFlowAutoencoder.n_channels_summary: 128
+LatentFlowAutoencoder.n_summary: 1
+LatentFlowAutoencoder.squeeze: 1
+LatentFlowAutoencoder.n_fsq: 5
+LatentFlowAutoencoder.bottleneck_type: fsq
+LatentFlowAutoencoder.vq_codebook_size: 1024
+LatentFlowAutoencoder.vq_codebook_dim: 8
+LatentFlowAutoencoder.fsq_group_size: 4
+LatentFlowAutoencoder.p_quant_dropout: 0.0
+LatentFlowAutoencoder.register_init: default
+LatentFlowAutoencoder.bottleneck_norm_position: post_proj
+LatentFlowAutoencoder.upsample: true
+LatentFlowAutoencoder.upsampler_cond: prepend
+LatentFlowAutoencoder.decoder_cond: prepend
+LatentFlowAutoencoder.adaln_zero: true
+LatentFlowAutoencoder.p_cond_dropout: 0.0
+LatentFlowAutoencoder.n_channels_enc: 512
+LatentFlowAutoencoder.n_channels_dec: 512
+LatentFlowAutoencoder.mult_enc: 4
+LatentFlowAutoencoder.mult_dec: 4
+LatentFlowAutoencoder.n_layers_enc: 12
+LatentFlowAutoencoder.n_layers_dec: 12
+LatentFlowAutoencoder.n_heads_enc: 8
+LatentFlowAutoencoder.n_heads_dec: 8
+LatentFlowAutoencoder.p_dropout: 0.0
+LatentFlowAutoencoder.bias: true
+LatentFlowAutoencoder.pos_enc: rope
+LatentFlowAutoencoder.qk_norm: true
+LatentFlowAutoencoder.use_sdpa: true
+
+AdamW.betas: [0.8, 0.99]  # [0.9, 0.999]
+AdamW.lr: 0.0001
+AdamW.weight_decay: 0.000001
+
+################################################################################
+# Data
+################################################################################
+
+train/OneShotDataset.sources: ["manifests/training/oneshots_train.csv"]
+val/OneShotDataset.sources: ["manifests/training/oneshots_val.csv"]
+OneShotDataset.audio_backend: file
+OneShotDataset.relative_path: .
+
+train/OneShotDataset.n_examples: 100000000
+val/OneShotDataset.n_examples: 2000
+
+train/OneShotDataset.with_replacement: true
+val/OneShotDataset.with_replacement: false
+
+OneShotDataset.sample_rate: *sample_rate
+OneShotDataset.duration: &duration 3.0
+OneShotDataset.from_start: true
+OneShotDataset.num_channels: 2
+OneShotDataset.shuffle_state: 0
+OneShotDataset.loudness_cutoff: null
+OneShotDataset.salience_num_tries: 8
+OneShotDataset.path_col: oneshot
+OneShotDataset.label_col: coarse_label
+
+################################################################################
+# Tokenizer
+################################################################################
+
+init_from_first_batch: true  # Estimate latent scaling on this corpus, not paper data.
+
+Tokenizer.name: stable_audio
+Tokenizer.scale_mean: true
+Tokenizer.scale_std: true
+Tokenizer.scale_per_channel: true
+Tokenizer.load_saved_scale: false
+Tokenizer.normalize_db: null
+Tokenizer.loudness_exclude_silence: true
+
+################################################################################
+# Batch construction
+################################################################################
+
+train/build_batch_config.max_audio_len: *duration
+val/build_batch_config.max_audio_len: *duration
+sample/build_batch_config.max_audio_len: *duration
+
+train/build_batch_config.out_batch_size: *batch_size
+val/build_batch_config.out_batch_size: *val_batch_size
+sample/build_batch_config.out_batch_size: *val_batch_size
+
+train/build_batch_config.p_mixup_intra_class: 0.25
+train/build_batch_config.p_mixup_inter_class: 0.25
+train/build_batch_config.alpha: 1.0
+
+val/build_batch_config.p_mixup_intra_class: 0.0
+val/build_batch_config.p_mixup_inter_class: 0.0
+val/build_batch_config.alpha: 1.0
+
+sample/build_batch_config.p_mixup_intra_class: 0.0
+sample/build_batch_config.p_mixup_inter_class: 0.0
+sample/build_batch_config.alpha: 1.0
+
+################################################################################
+# Flow Timesteps
+################################################################################
+
+train/build_timestep_config.mode: power
+train/build_timestep_config.power: 2.0
+train/build_timestep_config.t_min: 0.0
+train/build_timestep_config.t_max: 0.999
+
+val/build_timestep_config.mode: power
+val/build_timestep_config.power: 2.0
+val/build_timestep_config.t_min: 0.0
+val/build_timestep_config.t_max: 0.999
+
+################################################################################
+# Augmentations
+################################################################################
+
+train/build_transform.names: [
+  "Speed",
+  "ParametricEqualizer",
+  "WaveshaperDistortion",
+  "Delay",
+  "NoiseReverb",
+  "HighPass",
+  "LowPass",
+  "Compressor",
+  "ClippingDistortion",
+  "VolumeNorm",
+]
+train/build_transform.prob: 1.0
+
+val/build_transform.names: ["Identity"]
+val/build_transform.prob: 1.0
+
+Speed.prob: 0.25
+Speed.ratio: ["uniform", 0.8, 1.2]
+Speed.force_fast: true
+Speed.match_energy: true
+Speed.ensure_max_of_audio: true
+
+ParametricEqualizer.prob: 0.25
+ParametricEqualizer.match_energy: true
+ParametricEqualizer.ensure_max_of_audio: true
+
+WaveshaperDistortion.prob: 0.1
+WaveshaperDistortion.drive: ["uniform", 1.0, 10.0]
+WaveshaperDistortion.mix: ["uniform", 0.5, 1.0]
+WaveshaperDistortion.normalize: false
+WaveshaperDistortion.match_energy: true
+WaveshaperDistortion.ensure_max_of_audio: true
+
+Delay.prob: 0.2
+Delay.delay_ms: ["uniform", 30.0, 200.0]
+Delay.feedback: ["uniform", 0.2, 0.7]
+Delay.n_taps: 16
+Delay.mix: ["uniform", 0.1, 0.4]
+Delay.low_cutoff: ["choice", [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000]]
+Delay.high_cutoff: ["choice", [2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000, 11000, 12000, 13000, 14000, 15000, 16000]]
+Delay.match_energy: true
+Delay.ensure_max_of_audio: true
+
+NoiseReverb.prob: 0.05
+NoiseReverb.mix: ["uniform", 0.1, 0.5]
+NoiseReverb.decay: ["uniform", 0.05, 0.6]
+NoiseReverb.ir_duration: ["uniform", 0.1, 1.0]
+NoiseReverb.attack: ["uniform", 0.0, 0.05]
+NoiseReverb.start_at_peak: false
+NoiseReverb.eq_amount: ["uniform", 0.0, 0.5]
+NoiseReverb.match_energy: true
+NoiseReverb.ensure_max_of_audio: true
+
+HighPass.prob: 0.1
+HighPass.cutoff: ["choice", [50, 75, 100, 125, 150, 175, 200, 225, 250, 500, 1000]]
+HighPass.zeros: 51
+HighPass.quantize_hz: 1.0
+HighPass.match_energy: true
+HighPass.ensure_max_of_audio: true
+
+LowPass.prob: 0.1
+LowPass.cutoff: ["choice", [4000, 5000, 6000, 7000, 8000, 9000, 10000, 11000, 12000, 13000, 14000, 15000, 16000]]
+LowPass.zeros: 51
+LowPass.quantize_hz: 1.0
+LowPass.match_energy: true
+LowPass.ensure_max_of_audio: true
+
+Compressor.prob: 0.25
+Compressor.threshold_db: ["uniform", -35.0, -15.0]
+Compressor.ratio: ["uniform", 2.0, 30.0]
+Compressor.attack_ms: ["uniform", 1.0, 20.0]
+Compressor.release_ms: ["uniform", 20.0, 100.0]
+Compressor.knee_db: ["const", 0.0]
+Compressor.makeup_gain_db: ["const", 0.0]
+Compressor.lookahead_ms: ["const", 0.0]
+Compressor.sidechain: peak
+Compressor.match_energy: true
+Compressor.ensure_max_of_audio: true
+
+ClippingDistortion.prob: 0.025
+ClippingDistortion.perc: ["uniform", 0.0, 0.1]
+ClippingDistortion.mix: ["uniform", 0.5, 1.0]
+ClippingDistortion.match_energy: true
+ClippingDistortion.ensure_max_of_audio: true
+
+VolumeNorm.prob: 0.5
+VolumeNorm.db: ["uniform", -36.0, -8.0]
+VolumeNorm.match_energy: false
+VolumeNorm.ensure_max_of_audio: true

@@ -1,0 +1,4 @@
+oneshot,label,coarse_label,fine_label,midi_fine_note,midi_coarse_note,kit_name,source_dataset,source_family,duration,sample_rate,channel_count,filename,subdir,midi_note,midi_note_source,velocity_layer,packed_audio_path,packed_audio_offset,packed_audio_num_frames,packed_audio_num_channels,packed_audio_sample_rate,packed_audio_dtype
+/absolute/path/to/oneshots/kick/kick01.wav,kick,kick,kick,36,36,,,,,,,,,,,,,,,,,
+/absolute/path/to/oneshots/snare/snare01.wav,snare,snare,snare,38,38,,,,,,,,,,,,,,,,,
+/absolute/path/to/oneshots/hat/hat01.wav,hat,hat,hat_open,46,42,,,,,,,,,,,,,,,,,

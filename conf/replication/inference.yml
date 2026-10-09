@@ -1,0 +1,27 @@
+# Saved paper decoding settings; CLI paths override these settings.
+device: cuda
+input_layout: evaluation
+sliding_window: false
+batch_size: 64
+duration_s: 4.0
+normalize_db: -16.0
+normalize_ensure_max: true
+enable_sdpa: false
+# Retain submission-time cached-key positioning for verbatim replication.
+legacy_key_positions: true
+amp_encode: true
+amp_generate: true
+max_new_tokens: 2047
+top_p: 0.95
+top_k: null
+top_p_cls: 0.95
+top_p_ons: 0.95
+top_p_acoustic: 0.95
+temp: 1.0
+argmax: false
+eos_threshold: null
+monotonic_onsets: false
+# Retains exactly the complete events used by the historical parser, adding EOS.
+complete_events: true
+max_events: 60
+seed: 0

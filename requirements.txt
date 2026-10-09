@@ -1,0 +1,17 @@
+argbind
+descript-audiotools
+numpy
+primePy
+torch
+torchaudio
+tensorboard
+mido
+einops
+soundfile
+julius
+scipy
+librosa
+rich
+flatten-dict
+matplotlib
+PyYAML

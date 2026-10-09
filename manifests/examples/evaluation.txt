@@ -1,0 +1,20 @@
+Layout under the --root directory passed to scripts/evaluate.py:
+
+inputs/<dataset>/audio/<id>.wav
+inputs/<dataset>/transcript/<id>.mid|.txt|.json
+inputs/synthetic/oneshot/<id>/*.wav
+predictions/final_normm16_p095_fullamp_ae5/{transcripts,roundtrip,oneshots}/<dataset>/audio/...
+predictions/<baseline>/transcription/preds/<dataset>/<id>.json
+predictions/idm/roundtrip/<dataset>/<id>.wav
+predictions/<baseline>/oneshot/synthetic/<class>/<id>.wav
+codecs/inputs/00000.wav ... 01999.wav
+codecs/reconstructions/{dac,codicodec,autoencoder,melodyflow}/00000.wav ... 01999.wav
+
+Datasets: e_gmd, mdb_drums, synthetic, fsl10k (round-trip only).
+Baselines: idm, dose, adtof.
+Baseline hats use hihat. Transcripts are MIDI for E-GMD, text for MDB,
+and JSON for synthetic. Full scoring expects 4,500
+decomposition inputs and four sets of 2,000 codec reconstructions.
+Both raw MSE and L1 spectral scores are written, alongside RMS-matched scores.
+Scorers write summary JSON, per-recording CSVs, and Markdown/TeX tables without
+requiring the paper source files.
